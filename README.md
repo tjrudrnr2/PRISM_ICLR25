@@ -6,12 +6,12 @@ conda activate prism
 pip install -r requirements.txt
 pip3 install torch torchvision torchaudio
 ```
-## RUN
 ```
 wandb login PERSONAL_API_KEY
 ```
 - --save=True is an optional, if you want to log WANDB.
 
+# RUN
 ## IID
 - DP case
 ```
