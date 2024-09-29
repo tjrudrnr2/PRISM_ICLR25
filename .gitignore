@@ -1,0 +1,8 @@
+*.log
+*.png
+*.pyc
+*.npz
+*.pth
+__pycache__/
+wandb/
+*.npy

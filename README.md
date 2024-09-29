@@ -10,14 +10,28 @@ pip3 install torch torchvision torchaudio
 ```
 wandb login PERSONAL_API_KEY
 ```
-- --num_scorelayer=0~1, for $\textbf{PRISM}-\alpha$. Default configuration is 0 ($\textbf{PRISM}$).
 - --save=True is an optional, if you want to log WANDB.
 
-## IID case
+## IID
+- DP case
 ```
-python run_prism.py --model=prism --aggregation=BA --dataset=mnist --iid=1 --gpunum=0 --epochs=300 --experiments=EXPERIMENTS --dp_epsilon=9.8 --server_ema --num_scorelayer=0
+python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=1 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dp_epsilon=9.8 --dynamic_ema --save=True
+```
+- No-DP case
+```
+python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=1 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dynamic_ema --save=True
 ```
 ## Non-IID case
+- DP case
 ```
-python run_prism.py --model=prism --aggregation=BA --dataset=mnist --iid=0 --divide=4 --gpunum=0 --epochs=150 --experiments=EXPERIMENTS --dp_epsilon=9.8 --server_ema --num_scorelayer=0 
+python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=0 --divide=4 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dp_epsilon=9.8 --dynamic_ema --save=True
+```
+- No-DP case
+```
+python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=0 --divide=4 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dynamic_ema --save=True
+```
+## PRISM-$\alpha$
+- --num_scorelayer=0~1, for $\textbf{PRISM}-\alpha$. Default configuration is 0 ($\textbf{PRISM}$).
+```
+python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=1 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dp_epsilon=9.8 --num_scorelayer=0.8 --save=True
 ```
