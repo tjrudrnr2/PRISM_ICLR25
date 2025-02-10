@@ -1,4 +1,12 @@
-# PRISM: PRivacy-preserving Improved Stochastic Masking for federated generative models
+# [ICLR25] PRISM: PRivacy-preserving Improved Stochastic Masking for federated generative models
+
+<a href=''><img src='https://img.shields.io/badge/Paper-Arxiv-red'></a> <a href=''><img src='https://img.shields.io/badge/Code-Github-green'></a> 
+
+![PRISM_overview](https://github.com/tjrudrnr2/PRISM_ICLR25/assets/Overview.pdf)
+
+## 📌 News 📌
+[2025.01.22] - 🎊 **PRISM** has been accepted by ICLR 2025! 🎊
+
 ## Requirements
 ```
 conda create -n prism python=3.10.9
