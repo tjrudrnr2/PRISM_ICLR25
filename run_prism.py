@@ -62,7 +62,7 @@ def init():
     return start_time, log, args, path_project, device
                
 
-def build_Server_Client(args, trainset_list, test_dataloader, classifier, noise_multiplier):
+def build_Server_Client(args, trainset_list, test_dataloader, classifier):
     from clients.prism import Client
     from servers.prism import Server
     args.lr = 0.1
@@ -70,7 +70,7 @@ def build_Server_Client(args, trainset_list, test_dataloader, classifier, noise_
     ### Create clients and server
     client_list = []
     for client_idx in range(args.num_users):
-        client = Client(args, classifier, trainset_list[client_idx], client_idx, device, noise_multiplier)
+        client = Client(args, classifier, trainset_list[client_idx], client_idx, device)
         client_list.append(client)
     server = Server(args, classifier, client_list, test_dataloader, device)
     
@@ -122,17 +122,8 @@ if __name__ == '__main__':
     # Build Classifier
     classifier = getClassifier(args, log)
     
-    if args.dp_epsilon != 0:
-        accountant = RDPAccountant()
-        dp_sensitivity = (1 - 2 * args.dp_clip) * np.sqrt(args.num_users)
-        noise_muliplier = 2 * np.log(1.25 / args.dp_delta) * np.power(dp_sensitivity, 2) / np.power(args.dp_epsilon, 2)
-        print("epsilon : ", args.dp_epsilon, "noise_multiplier : ", noise_muliplier)
-    else:
-        noise_muliplier = 0
-        
-    
     # Build Server and Client
-    server, client_list = build_Server_Client(args, trainset_list, test_dataloader, classifier, noise_muliplier)
+    server, client_list = build_Server_Client(args, trainset_list, test_dataloader, classifier)
     
     eval_dict = {
         'epoch' : [],
@@ -147,19 +138,6 @@ if __name__ == '__main__':
     for epoch in range(args.epochs):
         client_loss, global_loss = server.train(epoch)
         
-        if args.dp_epsilon != 0:
-            rdp = privacy_analysis.compute_rdp(
-                q=0.1,
-                noise_multiplier=noise_muliplier,
-                steps=(epoch+1),
-                orders=accountant.DEFAULT_ALPHAS,
-            )
-            eps, best_alpha = privacy_analysis.get_privacy_spent(
-                orders=accountant.DEFAULT_ALPHAS, rdp=rdp, delta=args.dp_delta
-            )
-            privacy_budget = eps
-            print(f"Epoch : {epoch} privacy_budget : {privacy_budget:.6f} best_alpha : {best_alpha}")
-
         if epoch % args.evalIter == 0:
             # server.global_model.to(server.device)
             IS, fid, prdc_value, test_imgs = server.evaluate(epoch)
@@ -177,11 +155,6 @@ if __name__ == '__main__':
                     json.dump(eval_dict, f, indent=4)
                 record(args, epoch, client_loss, global_loss, eval_dict, IS, fid, prdc_value, test_imgs)
         print('\n Total Run Time: {0:0.4f}'.format(time.time()-start_time))
-            
-        if args.dp_epsilon != 0:
-            if privacy_budget > args.dp_epsilon:
-                print(f"Privacy Budget over!! DP terminate at epoch {epoch}")
-                break
     
     exp_details(args)
     print('\n Total Run Time: {0:0.4f}'.format(time.time()-start_time))

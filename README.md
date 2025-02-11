@@ -1,45 +1,40 @@
-# [ICLR25] PRISM: PRivacy-preserving Improved Stochastic Masking for federated generative models
+# [ICLR'25] PRISM: PRivacy-preserving Improved Stochastic Masking for federated generative models
 
 <a href=''><img src='https://img.shields.io/badge/Paper-Arxiv-red'></a> <a href=''><img src='https://img.shields.io/badge/Code-Github-green'></a> 
 
-![PRISM_overview](https://github.com/tjrudrnr2/PRISM_ICLR25/assets/Overview.pdf)
+<img src = "./assets/Overview.png" width="100%" height="100%"/>
+
 
 ## 📌 News 📌
 [2025.01.22] - 🎊 **PRISM** has been accepted by ICLR 2025! 🎊
 
-## Requirements
+## Usage
+### Installation
 ```
 conda create -n prism python=3.10.9
 conda activate prism
 pip install -r requirements.txt
 pip3 install torch torchvision torchaudio
+mkdir embeddings embeddings/npz embeddings/precompute
 ```
+### WanDB
 ```
 wandb login PERSONAL_API_KEY
 ```
-- --save=True is an optional, if you want to log WANDB.
+- --save=True is an optional, only when logging to WANDB.
 
-# RUN
-## IID
-- DP case
+## Training
+### IID and DP case
 ```
-python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=1 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dp_epsilon=9.8 --dynamic_ema --save=True
+python ./run_prism.py --model=prism --aggregation=BA --dataset={mnist|fmnist|celeba|cifar} --gpu=0 --iid=1 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dp_epsilon=9.8 --MADA
 ```
-- No-DP case
+### Non-IID case and DP case
+- Shards split : --split shards --divide=4
+- dirichlet split : --split dirichlet --dir_alpha 0.005
 ```
-python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=1 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dynamic_ema --save=True
+python ./run_prism.py --model=prism --aggregation=BA --dataset={mnist|fmnist|celeba|cifar} --gpu=0 --iid=0 --split {shards | dirichlet} --divide=4 --dir_alpha 0.005 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dp_epsilon=9.8 --MADA
 ```
-## Non-IID case
-- DP case
-```
-python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=0 --divide=4 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dp_epsilon=9.8 --dynamic_ema --save=True
-```
-- No-DP case
-```
-python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=0 --divide=4 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dynamic_ema --save=True
-```
-## PRISM-$\alpha$
-- --num_scorelayer=0~1, for $\textbf{PRISM}-\alpha$. Default configuration is 0 ($\textbf{PRISM}$).
-```
-python ./run_prism.py --model=prism --aggregation=BA --dataset=mnist --gpu=0 --iid=1 --gpunum=0 --num_scorelayer=0 --epochs=500 --experiments=EXRIMENTS --dp_epsilon=9.8 --num_scorelayer=0.8 --save=True
-```
+### PRISM-$\alpha$
+<img src = "./assets/prism_alpha.png" width="100%" height="100%"/>
+
+- --num_scorelayer=0~1, for PRISM-$\alpha$. Default configuration is 0 (equivalent with PRISM).

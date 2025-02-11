@@ -10,11 +10,9 @@ import matplotlib.pyplot as plt
 
 from models.prism import ResnetG
 from scipy.stats import bernoulli
-from utils.utils import compute_distance, track_bn_statistics, untrack_bn_statistics
-from utils.sam_opt import SAM
 
 class Client(object):
-    def __init__(self, args, classifier, dataset, client_idx, device, noise_multiplier):
+    def __init__(self, args, classifier, dataset, client_idx, device):
         self.args = args
         self.Clf = classifier
         self.client_idx = client_idx
@@ -35,8 +33,6 @@ class Client(object):
         # get Number of Features from Classifier
         self.numFeaturesInEnc, self.numFeaturesForEachSelectedLayerm, self.numLayersToFtrMatching = self.get_numFeaturesInEnc(self.args.numLayersToFtrMatching)
         self.__build_NetMeanVar(self.numFeaturesInEnc)
-        
-        self.noise_multiplier = noise_multiplier
         
 
         # get models and optimizers
@@ -150,13 +146,8 @@ class Client(object):
     def __getOptimizers(self):
         parametersG = set()
         parametersG |= set(self.gfmn.parameters())
-        if self.args.use_sam:
-            self.optimizerG = SAM(params=parametersG,
-                                  base_optimizer=torch.optim.SGD,
-                                  lr=self.args.lr,
-                                  rho=self.args.rho)
-        else:
-            self.optimizerG = optim.Adam(parametersG, lr=self.args.lr, betas=(self.args.beta1, 0.999))
+        
+        self.optimizerG = optim.Adam(parametersG, lr=self.args.lr, betas=(self.args.beta1, 0.999))
         self.optimizerMean = optim.Adam(self.NetMean.parameters(
         ), lr=self.args.lrMovAvrg, betas=(self.args.beta1, 0.999))
         self.optimizerVar = optim.Adam(
@@ -273,10 +264,6 @@ class Client(object):
         self.gfmn.train()
 
         batch_loss = []
-        
-        if self.args.local_mask_corr:
-            global_mask = copy.deepcopy(self.gfmn.state_dict())
-            local_mask_corr = []
 
         # Precomputing Real Datasets
         globalFtrMeanValues, globalFtrVarValues = self.Load_precomputed_realData()
@@ -295,8 +282,6 @@ class Client(object):
             self.gfmn.zero_grad()
             self.NetMean.zero_grad()
             self.NetVar.zero_grad()
-            if self.args.use_sam:
-                self.gfmn.apply(track_bn_statistics)
 
             # creates noise and fake Datas
             noise = torch.randn(self.args.local_bs, self.args.nz, 1, 1)
@@ -342,35 +327,7 @@ class Client(object):
             # compute loss generator
             lossNetG = lossNetGMean + lossNetGVar
             lossNetG.backward()
-            if self.args.use_sam:
-                self.optimizerG.first_step(zero_grad=True)
-                self.gfmn.apply(untrack_bn_statistics)
-                
-                # creates noise and fake Datas
-                noise = torch.randn(self.args.local_bs, self.args.nz, 1, 1)
-                noise = noise.to(self.device)
-                fakeData = self.gfmn(noise)
-                
-                fakeData = self.preprocess_fakeData(fakeData, self.imageNetNormRangeV, self.imageNetNormMinV)
-                ftrsFakeData= self.extractFeatures(fakeData, detachOutput=False)
-                
-                ftrsMeanFakeData = torch.mean(ftrsFakeData, 0)
-                ftrsVarFakeData = torch.var(ftrsFakeData, 0)
-                
-                meanDiffXTrueMean = self.NetMean(globalFtrMeanValues.view(1, -1)).detach()
-                meanDiffXFakeMean = self.NetMean(ftrsMeanFakeData.view(1, -1))
-
-                varDiffXTrueVar = self.NetVar(globalFtrVarValues.view(1, -1)).detach()
-                varDiffXFakeVar = self.NetVar(ftrsVarFakeData.view(1, -1))
-
-                lossNetGMean = (meanDiffXTrueMean - meanDiffXFakeMean)
-                lossNetGVar = (varDiffXTrueVar - varDiffXFakeVar)
-            
-                lossNetG = lossNetGMean + lossNetGVar
-                lossNetG.backward()
-                self.optimizerG.second_step(zero_grad=True)
-            else:
-                self.optimizerG.step()
+            self.optimizerG.step()
             
             # Visualization Batch Loss
             batch_loss.append(lossNetG.item())
@@ -394,54 +351,6 @@ class Client(object):
                 avrgLossNetGVar = 0.0
                 avrgLossNetMean = 0.0
                 avrgLossNetVar = 0.0
-            
-            if self.args.local_mask_corr and iter == (self.args.local_ep - 1) and epoch % self.args.evalIter == 0:
-                server_mask = dict()
-                local_mask = dict()
-                with torch.no_grad():
-                    for k, v in global_mask.items():
-                        if 'scores' in k:
-                            target = v.to(self.device)
-                            theta = torch.sigmoid(target)
-                            
-                            updates_s = bernoulli.rvs(theta.cpu().numpy())
-                            if self.args.dataset == 'mnist' and 'net.lastConv.scores' in k:
-                                updates_s = np.expand_dims(updates_s, axis=0)
-                            if server_mask.get(k) is None:
-                                server_mask[k] = torch.tensor(updates_s, device=self.device)
-                            else:
-                                server_mask[k] += torch.tensor(updates_s, device=self.device)
-                        else:
-                            if server_mask.get(k) is None:
-                                server_mask[k] = torch.tensor(v, device=self.device)
-                            else:
-                                server_mask[k] += torch.tensor(v, device=self.device)
-                                
-                with torch.no_grad():
-                    for k, v in self.gfmn.state_dict().items():
-                        if 'scores' in k:
-                            target = v.to(self.device)
-                            theta = torch.sigmoid(target)
-                            
-                            updates_s = bernoulli.rvs(theta.cpu().numpy())
-                            if self.args.dataset == 'mnist' and 'net.lastConv.scores' in k:
-                                updates_s = np.expand_dims(updates_s, axis=0)
-                            if local_mask.get(k) is None:
-                                local_mask[k] = torch.tensor(updates_s, device=self.device)
-                            else:
-                                local_mask[k] += torch.tensor(updates_s, device=self.device)
-                        else:
-                            if local_mask.get(k) is None:
-                                local_mask[k] = torch.tensor(v, device=self.device)
-                            else:
-                                local_mask[k] += torch.tensor(v, device=self.device)
-                            
-                hamming_distances = compute_distance(server_mask, local_mask)
-                local_mask_corr.append(hamming_distances)
-                epochs = list(range(len(local_mask_corr)))
-                
-                # 결과 출력
-                print(f"Round {epoch} Hamming Distance: {hamming_distances}")
                 
         return self.gfmn.state_dict(), self.NetMean.state_dict(), self.NetVar.state_dict(), self.optimizerMean.state_dict(), self.optimizerVar.state_dict(), batch_loss, lossNetG
 
@@ -452,7 +361,7 @@ class Client(object):
         with torch.no_grad():
             for k, v in self.gfmn.state_dict().items():
                 if 'scores' in k:
-                    if self.noise_multiplier != 0:
+                    if self.args.dp_epsilon != 0:
                         dp_sensitivity = (1 - 2 * self.args.dp_clip) * np.sqrt(v.numel())
                         noise_multiplier = np.sqrt(2 * np.log(1.25 / self.args.dp_delta) / self.args.dp_epsilon)
                         sigma = np.sqrt(noise_multiplier * dp_sensitivity)
@@ -466,7 +375,7 @@ class Client(object):
                     theta = torch.sigmoid(target)
                     theta += dp_noise
                     
-                    if self.noise_multiplier != 0:
+                    if self.args.dp_epsilon != 0:
                         theta = torch.clamp(target, self.args.dp_clip, 1-self.args.dp_clip)
                     
                     if k in self.mask_layer:
@@ -480,7 +389,7 @@ class Client(object):
                         else:
                             param_dict[k] += torch.tensor(updates_s, device=self.device)
                     elif k in self.score_layer:
-                        if self.noise_multiplier != 0:
+                        if self.args.dp_epsilon != 0:
                             if param_dict.get(k) is None:
                                 param_dict[k] = torch.tensor(theta, device=self.device)
                             else:

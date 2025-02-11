@@ -27,12 +27,6 @@ def args_parser():
                         help='SGD momentum (default: 0.5)')
     # avgM
     parser.add_argument('--aggregation', type=str, default='avgM', help='How to aggregate')
-
-    # model arguments
-    # PRISM
-    parser.add_argument('--model', type=str, default='prism', help='model name')
-    
-    # PRISM arguments
     parser.add_argument('--bias', type=bool, default=False, help='')
  
     # vgg19-pytorch | clip_resnet50
@@ -56,9 +50,6 @@ def args_parser():
     parser.add_argument('--vgg_embedder_batch_norm', type=bool, default=True, help='if you load vgg16 model, the vgg16 model has batch norm')
     parser.add_argument('--embedder_backbone', type=str, default='inceptionV3', help='')
     parser.add_argument('--channel_multiplier', type=int, default=1, help='')
-    parser.add_argument('--tsne', action='store_true', help='')
-    parser.add_argument('--mask_corr', action='store_true', help='')
-    parser.add_argument('--global_mask_corr', action='store_true', help='')
     parser.add_argument('--local_mask_corr', action='store_true', help='')
     
     
@@ -66,28 +57,14 @@ def args_parser():
     parser.add_argument('--dp_epsilon', type=float, default=0) ### if use, 9.8
     parser.add_argument('--dp_clip', type=float, default=0.1)
     parser.add_argument('--dp_delta', type=float, default=1e-5)
-    
-    # DDPM
-    parser.add_argument('--hid_channels', type=int, default=128, help='')
-    parser.add_argument('--ch_multipliers', type=list, default=[1, 2, 2, 2], help='')
-    parser.add_argument('--num_res_blocks', type=int, default=2, help='')
-    parser.add_argument('--apply_attn', type=list, default=[False, True, False, True], help='')
-    parser.add_argument('--drop_rate', type=float, default=0.1, help='')
-    parser.add_argument('--timestep', type=int, default=1000, help='')
-    parser.add_argument('--skip_schedule', type=str, default="linear", help='')
-    parser.add_argument('--subseq-size', type=int, default=50, help='')
-        
+
     # other arguments
     parser.add_argument('--num_scorelayer', type=float, default=0, 
                         help='number of directly sending layer score 0 ~ 1 value.')
     parser.add_argument('--server_ema', action='store_true', help='')
     parser.add_argument('--ema_beta', type=float, default=0.5, help='')
-    parser.add_argument('--dynamic_ema', action='store_true', help='')
+    parser.add_argument('--MADA', action='store_true', help='')
     parser.add_argument('--dist_type', type=str, default='hd', help='')
-    
-    # SAM optimizer
-    parser.add_argument('--use_sam', action='store_true', help='')
-    parser.add_argument('--rho', type=float, default=0.1, help='')
     
     ## mnist | fmnist | celeba  | cifar
     parser.add_argument('--dataset', type=str, default='mnist', help="name \
@@ -97,6 +74,9 @@ def args_parser():
     parser.add_argument('--gpunum', default=0)
     parser.add_argument('--iid', type=int, default=1,
                         help='Default set to IID. Set to 0 for non-IID.')
+    parser.add_argument('--split', type=str, default="shards", 
+                        help='shards | dirichlet')
+    parser.add_argument('--dir_alpha', type=float, default=0.005, help='')
     parser.add_argument('--divide', type=int, default=4,
                         help='The set of partition for non-iid. ex) if set to 4, dataset will be 4-class non-iid')
     parser.add_argument('--unequal', type=int, default=0,

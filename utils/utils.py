@@ -24,14 +24,6 @@ logger = logging.getLogger(__name__)
 from itertools import chain
 from pathlib import Path
 
-def untrack_bn_statistics(m):
-    if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
-        m.track_running_stats = False
-
-
-def track_bn_statistics(m):
-    if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
-        m.track_running_stats = True
         
 def listdir(dname):
     # 해당 경로 하위의 모든 image파일 경로 
@@ -121,41 +113,7 @@ def compare_global_mask(args, global_model, aggregated_weights, globalmask_corr,
     # 결과 출력
     print(f"Round {epoch} Distance: {hamming_distances}")
     
-    return hamming_distances
-    
-def compare_mask(args, global_model, client_list, epoch, device):
-    ###########################
-    ### Compute server mask ###
-    ###########################
-    server_mask = dict()
-    with torch.no_grad():
-        for k, v in global_model.state_dict().items():
-            if 'scores' in k:
-                target = v.to(device)
-                theta = torch.sigmoid(target)
-                
-                updates_s = bernoulli.rvs(theta.cpu().numpy())
-                updates_s = np.where(updates_s == 0, 0.01, updates_s)
-                updates_s = np.where(updates_s == 1, 0.09, updates_s)
-                if args.dataset == 'mnist' and 'net.lastConv.scores' in k:
-                    updates_s = np.expand_dims(updates_s, axis=0)
-                if server_mask.get(k) is None:
-                    server_mask[k] = torch.tensor(updates_s, device=device)
-                else:
-                    server_mask[k] += torch.tensor(updates_s, device=device)
-            else:
-                if server_mask.get(k) is None:
-                    server_mask[k] = torch.tensor(v, device=device)
-                else:
-                    server_mask[k] += torch.tensor(v, device=device)
-    
-    client_masks = [client.upload_mask() for client in client_list]
-    
-    hamming_distances = [compute_distance(server_mask, client_mask) for client_mask in client_masks]
-    
-    for i, dist in enumerate(hamming_distances):
-        print(f"Client {i + 1} Hamming Distance: {dist}")
-    
+    return hamming_distances    
 
 def getNetImageSizeAndNumFeats(net, setEncToEval=False, verbose=False, image_size = 32, use_cuda = True, device=None, nc = 3):
     '''return two list: 
@@ -400,6 +358,7 @@ def _split_noniid(args, dataset, num_users):
     :param num_users:
     :return:
     """
+
     if args.dataset == 'celeba':
         male_indices = [idx for idx in range(len(dataset)) if dataset.targets[idx][20]==1]
         female_indices = [idx for idx in range(len(dataset)) if dataset.targets[idx][20]==-1]
@@ -445,6 +404,39 @@ def _split_noniid(args, dataset, num_users):
         
     return dict_users
 
+def _split_noniid_dir(args, dataset, num_users, dir_alpha):
+    """
+    Sample non-I.I.D client data from MNIST dataset
+    :param dataset:
+    :param num_users:
+    :return:
+    """
+    
+    print("Dirichlet Split !!!")
+    MIN_SIZE = 0
+    NUM_CLASS = 10
+    idx = [np.where(dataset.targets == i)[0] for i in range(NUM_CLASS)]
+    idx_batch = [[] for _ in range(num_users)]
+    while MIN_SIZE < 10:
+        idx_batch = [[] for _ in range(num_users)]
+        for k in range(NUM_CLASS):
+            np.random.shuffle(idx[k])
+            distributions = np.random.dirichlet(np.repeat(dir_alpha, num_users))
+            distributions = np.array(
+                [
+                    p * (len(idx_j) < len(dataset) / num_users)
+                    for p, idx_j in zip(distributions, idx_batch)
+                ]
+            )
+            distributions = distributions / distributions.sum()
+            distributions = (np.cumsum(distributions) * len(idx[k])).astype(int)[:-1]
+            idx_batch = [
+                np.concatenate((idx_j, idx.tolist())).astype(np.int64)
+                for idx_j, idx in zip(idx_batch, np.split(idx[k], distributions))
+            ]
+            MIN_SIZE = min([len(idx_j) for idx_j in idx_batch])
+        
+    return idx_batch
 
 def _get_transform(args):
     train_transform, test_transform = [], []
@@ -541,7 +533,10 @@ def get_dataset(args):
     if args.iid:
         user_groups = _split_iid(train_dataset, args.num_users)
     else:
-        user_groups = _split_noniid(args, train_dataset, args.num_users)
+        if args.split == "shards":
+            user_groups = _split_noniid(args, train_dataset, args.num_users)
+        elif args.split == "dirichelt":
+            user_groups = _split_noniid_dir(args, train_dataset, args.num_users, args.dir_alpha)
         
     trainset_list = []
     for idx in range(args.num_users):

@@ -12,15 +12,13 @@ import copy
 from metrics.inception_score import inception_score
 import torchvision.utils as vutils
 
-from ema_pytorch import EMA
-
 from torch.utils.data import DataLoader
 from utils.utils import _get_transform, dataset_function
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
-from models.model_utils import dynamic_EMA
+from models.model_utils import MADA
 from utils.utils import compare_mask, compare_global_mask
 
 class Server(object):
@@ -53,14 +51,6 @@ class Server(object):
         self.global_model = ResnetG(self.args, args.nz, args.nc, args.ngf
                                     , args.imageSize, adaptFilterSize=not args.notAdaptFilterSize,
                     useConvAtSkipConn=args.useConvAtGSkipConn).to(self.device)
-        
-        if self.args.server_ema:
-                self.ema = EMA(
-                    self.global_model,
-                    beta=self.args.ema_beta,
-                    update_after_step=1,
-                    update_every=1,
-                    )
     
         self.layer = []    
         
@@ -171,29 +161,16 @@ class Server(object):
             print("Aggregation method : PRISM")
             global_weights = self.average_masks(epoch, idxs_users)
         
-        if self.args.global_mask_corr:
-            ema_coef = compare_global_mask(self.args, self.global_model, global_weights, self.globalmask_corr, epoch, self.device)
-            
-        if self.args.server_ema:
-            print(f"Global Model EMA Update and EMA beta is {self.args.ema_beta}")
-            # self.ema.update()
-            # self.global_model.load_state_dict(self.ema.ema_model.state_dict())
-            ema_param = dynamic_EMA(self.args, global_weights,
-                                    self.global_model.state_dict(), beta=self.args.ema_beta)
-            self.global_model.load_state_dict(ema_param)
-        elif self.args.dynamic_ema:
+        if self.args.MADA:
             print("Dynamic Global Model EMA Update")
             ema_coef = compare_global_mask(self.args, self.global_model, global_weights, self.globalmask_corr, epoch, self.device)
-            ema_param = dynamic_EMA(self.args, global_weights,
+            ema_param = MADA(self.args, global_weights,
                                     self.global_model.state_dict(), beta=ema_coef)
             self.global_model.load_state_dict(ema_param)
         else:
             # update global weights
             self.global_model.load_state_dict(global_weights)
             
-        if self.args.mask_corr:
-            compare_mask(self.args, self.global_model, self.client_list, epoch, self.device)
-
         return self.client_loss, global_loss
 
     def average_scrores_alpha(self, w):
@@ -220,7 +197,6 @@ class Server(object):
         for k, v in self.global_model.state_dict().items():
             if 'scores' in k:
                 aggregate_dict[k] = torch.zeros_like(v)
-            # aggregate_dict[k] = torch.zeros_like(v, dtype=torch.float32)
 
         with torch.no_grad():
             ## Mask aggregation
@@ -229,7 +205,6 @@ class Server(object):
                 for k, v in sampled_mask.items():
                     if 'scores' in k:
                         aggregate_dict[k] += v / len(idxs_users)
-                    # aggregate_dict[k] += torch.div(v, len(idxs_users))
 
             ## Theta to score
             for k, v in aggregate_dict.items():
@@ -254,7 +229,6 @@ class Server(object):
                 sampled_mask = self.client_list[client_idx].upload_mask()
                 for k, v in sampled_mask.items():
                     if 'scores' in k and k in self.mask_layer:
-                        print(k)
                         aggregate_dict[k] += v / len(idxs_users)
 
             ## Theta to score

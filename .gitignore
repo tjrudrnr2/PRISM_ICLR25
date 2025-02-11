@@ -6,3 +6,5 @@
 __pycache__/
 wandb/
 *.npy
+!assets/Overview.png
+!assets/prism_alpha.png
