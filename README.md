@@ -1,9 +1,9 @@
 # [ICLR'25] PRISM: PRivacy-preserving Improved Stochastic Masking for federated generative models
 
-<a href=''><img src='https://img.shields.io/badge/Paper-Arxiv-red'></a> <a href=''><img src='https://img.shields.io/badge/Code-Github-green'></a> 
+<a href=''><img src='https://img.shields.io/badge/Paper-Arxiv-red'></a> <a href=''><img src='https://img.shields.io/badge/Code-Github-green'></a> <a href='https://tjrudrnr2.github.io/PRISM_ICLR25/'><img src='https://img.shields.io/badge/Project page-Github-blue'></a>
+
 
 <img src = "./assets/Overview.png" width="100%" height="100%"/>
-
 
 ## 📌 News 📌
 [2025.01.22] - 🎊 **PRISM** has been accepted by ICLR 2025! 🎊
