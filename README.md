@@ -38,3 +38,13 @@ python ./run_prism.py --model=prism --aggregation=BA --dataset={mnist|fmnist|cel
 <img src = "./assets/prism_alpha.png" width="100%" height="100%"/>
 
 - --num_scorelayer=0~1, for PRISM-$\alpha$. Default configuration is 0 (equivalent with PRISM).
+
+## BibTex Citation
+```
+@article{seo2025prism,
+  title={PRISM: Privacy-Preserving Improved Stochastic Masking for Federated Generative Models},
+  author={Seo, Kyeongkook and Han, Dong-Jun and Yoo, Jaejun},
+  journal={arXiv preprint arXiv:2503.08085},
+  year={2025}
+}
+```
