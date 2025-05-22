@@ -178,10 +178,6 @@ body {
   margin: 0 auto; /* 중앙 정렬 */
 }
 
-.bibtex-title {
-  margin-bottom: 5px;  /* 제목과 BibTeX 코드 사이 간격 조절 */
-  text-align: left;  /* 제목 왼쪽 정렬 */
-}
 .bibtex-container {
   text-align: left;
   margin-left: 0;
